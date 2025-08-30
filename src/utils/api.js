@@ -1,10 +1,49 @@
 import axios from 'axios';
 
+// Cache system with different TTLs
+const cache = new Map();
+
+const getCacheKey = (prefix, ...args) => `${prefix}_${JSON.stringify(args)}`;
+
+const isExpired = (timestamp, ttlMs) => Date.now() - timestamp > ttlMs;
+
+const getFromCache = (key, ttlMs) => {
+  const cached = cache.get(key);
+  if (!cached) return null;
+  
+  if (isExpired(cached.timestamp, ttlMs)) {
+    cache.delete(key);
+    return null;
+  }
+  
+  return cached.data;
+};
+
+const setCache = (key, data) => {
+  cache.set(key, {
+    data,
+    timestamp: Date.now()
+  });
+};
+
+// Cache TTLs
+const CACHE_TTL = {
+  UGG: 60 * 1000,        // 1 minute for u.gg
+  YOUTUBE: 24 * 60 * 60 * 1000,  // 24 hours for YouTube
+  DATA_DRAGON: 60 * 60 * 1000    // 1 hour for Data Dragon
+};
+
 // Data Dragon API utilities
 export async function fetchDataDragonVersion() {
+  const cacheKey = getCacheKey('dd_version');
+  const cached = getFromCache(cacheKey, CACHE_TTL.DATA_DRAGON);
+  if (cached) return cached;
+
   try {
     const response = await axios.get('https://ddragon.leagueoflegends.com/api/versions.json');
-    return response.data[0];
+    const version = response.data[0];
+    setCache(cacheKey, version);
+    return version;
   } catch (error) {
     console.error('Error fetching Data Dragon version:', error);
     throw error;
@@ -12,9 +51,15 @@ export async function fetchDataDragonVersion() {
 }
 
 export async function fetchChampionData(version) {
+  const cacheKey = getCacheKey('champion_data', version);
+  const cached = getFromCache(cacheKey, CACHE_TTL.DATA_DRAGON);
+  if (cached) return cached;
+
   try {
     const response = await axios.get(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`);
-    return response.data.data;
+    const data = response.data.data;
+    setCache(cacheKey, data);
+    return data;
   } catch (error) {
     console.error('Error fetching champion data:', error);
     throw error;
@@ -23,6 +68,10 @@ export async function fetchChampionData(version) {
 
 // u.gg GraphQL API for live game data
 export async function fetchLiveGame(accountName) {
+  const cacheKey = getCacheKey('live_game', accountName);
+  const cached = getFromCache(cacheKey, CACHE_TTL.UGG);
+  if (cached) return cached;
+
   const [gameName, tagLine] = accountName.split('#');
   
   const query = `
@@ -123,7 +172,7 @@ export async function fetchLiveGame(accountName) {
 
     const myChampionInfo = getChampionInfo(currentPlayer.championId);
 
-    return {
+    const result = {
       myChampion: {
         id: currentPlayer.championId,
         name: myChampionInfo.name,
@@ -150,6 +199,9 @@ export async function fetchLiveGame(accountName) {
         };
       })
     };
+    
+    setCache(cacheKey, result);
+    return result;
   } catch (error) {
     if (error.response?.status === 404) {
       throw new Error('Not currently in game');
@@ -161,6 +213,9 @@ export async function fetchLiveGame(accountName) {
 
 // YouTube search API using youtube-v3-api package (v1.1.1)
 export async function searchYouTubeVideos(query, maxResults = 5) {
+  const cacheKey = getCacheKey('youtube', query, maxResults);
+  const cached = getFromCache(cacheKey, CACHE_TTL.YOUTUBE);
+  if (cached) return cached;
   const trySearch = async (apiKey) => {
     const { YoutubeDataAPI } = await import('youtube-v3-api');
     const api = new YoutubeDataAPI(apiKey);
@@ -189,7 +244,9 @@ export async function searchYouTubeVideos(query, maxResults = 5) {
     // Try main API key first
     if (process.env.REACT_APP_YOUTUBE_API_KEY) {
       try {
-        return await trySearch(process.env.REACT_APP_YOUTUBE_API_KEY);
+        const result = await trySearch(process.env.REACT_APP_YOUTUBE_API_KEY);
+        setCache(cacheKey, result);
+        return result;
       } catch (error) {
         console.warn('Main YouTube API key failed, trying backup:', error.message);
       }
@@ -198,13 +255,17 @@ export async function searchYouTubeVideos(query, maxResults = 5) {
     // Fallback to backup API key
     if (process.env.REACT_APP_YOUTUBE_API_KEY_BACKUP) {
       try {
-        return await trySearch(process.env.REACT_APP_YOUTUBE_API_KEY_BACKUP);
+        const result = await trySearch(process.env.REACT_APP_YOUTUBE_API_KEY_BACKUP);
+        setCache(cacheKey, result);
+        return result;
       } catch (error) {
         console.error('Backup YouTube API key also failed:', error.message);
       }
     }
 
-    return [];
+    const emptyResult = [];
+    setCache(cacheKey, emptyResult);
+    return emptyResult;
   } catch (error) {
     console.error('Error searching YouTube:', error);
     return [];
@@ -213,6 +274,10 @@ export async function searchYouTubeVideos(query, maxResults = 5) {
 
 // Champion abilities from BigBrain API (with proper champion ID lookup)
 export async function fetchChampionAbilities(championName) {
+  const cacheKey = getCacheKey('champion_abilities', championName);
+  const cached = getFromCache(cacheKey, CACHE_TTL.DATA_DRAGON);
+  if (cached) return cached;
+
   try {
     // First, get the champion ID (key) from Data Dragon
     const version = await fetchDataDragonVersion();
@@ -261,10 +326,13 @@ export async function fetchChampionAbilities(championName) {
         });
       });
 
+      setCache(cacheKey, abilities);
       return abilities;
     } catch (bigBrainError) {
       // Fallback to Data Dragon
-      return await fetchAbilitiesFromDataDragon(championId, version);
+      const fallbackAbilities = await fetchAbilitiesFromDataDragon(championId, version);
+      setCache(cacheKey, fallbackAbilities);
+      return fallbackAbilities;
     }
   } catch (error) {
     console.error('Error fetching champion abilities:', error);
