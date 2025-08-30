@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live LoL Helper</title>
+    <link rel="stylesheet" href="/live/assets/style.css">
+</head>
+<body>
+    <header class="top-menubar">
+        <div class="menu-controls">
+            <select id="accounts-dropdown" class="accounts-dropdown">
+                <option value="">Select Account...</option>
+            </select>
+            <button id="add-account-btn" class="btn">Add</button>
+            <button id="delete-account-btn" class="btn btn-danger">Delete</button>
+            <button id="refresh-btn" class="btn">Refresh</button>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <aside class="menu-left">
+            <div id="ally-champions" class="champion-list"></div>
+        </aside>
+
+        <section class="center">
+            <div class="center-header">
+                <h2 id="selected-champion-name">Select a champion</h2>
+            </div>
+
+            <div class="videos-row">
+                <div class="video-container">
+                    <iframe id="guide-video" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                </div>
+                <div class="video-container">
+                    <iframe id="matchup-video" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                </div>
+            </div>
+
+            <div class="abilities-section">
+                <div id="abilities-container" class="abilities-container"></div>
+            </div>
+        </section>
+
+        <aside class="menu-right">
+            <div id="enemy-champions" class="champion-list"></div>
+        </aside>
+    </main>
+
+    <div id="error-banner" class="error-banner hidden"></div>
+
+    <script src="/live/assets/script.js"></script>
+</body>
+</html>
