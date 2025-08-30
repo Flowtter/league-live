@@ -51,6 +51,55 @@ function debounce(func, wait) {
     };
 }
 
+// Champion learning management
+function getChampionLearningCount(championName) {
+    const learningData = getCookie('champion_learning');
+    const learning = learningData ? JSON.parse(learningData) : {};
+    return learning[championName.toLowerCase()] || 0;
+}
+
+function incrementChampionLearning(championName) {
+    const learningData = getCookie('champion_learning');
+    const learning = learningData ? JSON.parse(learningData) : {};
+    const key = championName.toLowerCase();
+    learning[key] = (learning[key] || 0) + 1;
+    setCookie('champion_learning', JSON.stringify(learning));
+    return learning[key];
+}
+
+function decrementChampionLearning(championName) {
+    const learningData = getCookie('champion_learning');
+    const learning = learningData ? JSON.parse(learningData) : {};
+    const key = championName.toLowerCase();
+    learning[key] = Math.max(0, (learning[key] || 0) - 1);
+    setCookie('champion_learning', JSON.stringify(learning));
+    return learning[key];
+}
+
+function getLearningRange() {
+    const learningData = getCookie('champion_learning');
+    const learning = learningData ? JSON.parse(learningData) : {};
+    const values = Object.values(learning).filter(v => v > 0);
+    if (values.length === 0) return { min: 0, max: 0 };
+    return { min: Math.min(...values), max: Math.max(...values) };
+}
+
+function getLearningBadgeColor(count, min, max) {
+    if (count === 0) return '#666666'; // Gray for 0
+    if (max === min) return '#2ecc71'; // Green if only one value
+    
+    // Interpolate from red (#e74c3c) to green (#2ecc71)
+    const ratio = (count - min) / (max - min);
+    
+    // Red: #e74c3c = rgb(231, 76, 60)
+    // Green: #2ecc71 = rgb(46, 204, 113)
+    const red = Math.round(231 * (1 - ratio) + 46 * ratio);
+    const green = Math.round(76 * (1 - ratio) + 204 * ratio);
+    const blue = Math.round(60 * (1 - ratio) + 113 * ratio);
+    
+    return `rgb(${red}, ${green}, ${blue})`;
+}
+
 // Account management
 function loadAccounts() {
     const accountsData = getCookie('lol_accounts');
@@ -251,16 +300,16 @@ function createChampionItem(player, team) {
     
     if (isMyChampion) {
         item.classList.add('my-champion');
-    } else {
-        // Only allow selection of champions that aren't the player's own
-        if (state.selectedChampionId === player.championId) {
-            item.classList.add('selected');
-        }
-        
-        item.addEventListener('click', () => {
-            selectChampion(player.championId, team);
-        });
     }
+    
+    // Allow selection of all champions including the player's own
+    if (state.selectedChampionId === player.championId) {
+        item.classList.add('selected');
+    }
+    
+    item.addEventListener('click', () => {
+        selectChampion(player.championId, team);
+    });
     
     const portrait = document.createElement('img');
     portrait.className = `champion-portrait ${team}`;
@@ -268,6 +317,19 @@ function createChampionItem(player, team) {
     portrait.alt = player.championName;
     
     item.appendChild(portrait);
+    
+    // Always add learning badge
+    const learningCount = getChampionLearningCount(player.championName);
+    const range = getLearningRange();
+    const badgeColor = getLearningBadgeColor(learningCount, range.min, range.max);
+    
+    const badge = document.createElement('div');
+    badge.className = 'learning-badge';
+    badge.textContent = learningCount;
+    badge.style.backgroundColor = badgeColor;
+    // Adjust text color for better contrast
+    badge.style.color = learningCount === 0 ? '#ffffff' : '#000000';
+    item.appendChild(badge);
     
     return item;
 }
@@ -507,6 +569,28 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (confirm(`Delete account "${state.selectedAccount}"?`)) {
             deleteAccount(state.selectedAccount);
+        }
+    });
+    
+    // Learnt button
+    document.getElementById('learnt-btn').addEventListener('click', () => {
+        if (!state.selectedChampionId) return;
+        
+        const championName = getChampionNameById(state.selectedChampionId);
+        if (championName) {
+            incrementChampionLearning(championName);
+            updateUI(); // Refresh to show updated badge
+        }
+    });
+    
+    // Forgot button
+    document.getElementById('forgot-btn').addEventListener('click', () => {
+        if (!state.selectedChampionId) return;
+        
+        const championName = getChampionNameById(state.selectedChampionId);
+        if (championName) {
+            decrementChampionLearning(championName);
+            updateUI(); // Refresh to show updated badge
         }
     });
     
