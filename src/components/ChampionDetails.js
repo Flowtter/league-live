@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ReactPlayer from 'react-player/youtube';
 import { fetchChampionAbilities, searchYouTubeVideos } from '../utils/api';
 
@@ -8,14 +8,7 @@ function ChampionDetails({ championName, myChampionName }) {
   const [loadingAbilities, setLoadingAbilities] = useState(false);
   const [loadingVideos, setLoadingVideos] = useState(false);
 
-  useEffect(() => {
-    if (championName) {
-      fetchAbilities();
-      fetchVideos();
-    }
-  }, [championName, myChampionName]);
-
-  const fetchAbilities = async () => {
+  const fetchAbilities = useCallback(async () => {
     setLoadingAbilities(true);
     try {
       const championAbilities = await fetchChampionAbilities(championName);
@@ -26,9 +19,9 @@ function ChampionDetails({ championName, myChampionName }) {
     } finally {
       setLoadingAbilities(false);
     }
-  };
+  }, [championName]);
 
-  const fetchVideos = async () => {
+  const fetchVideos = useCallback(async () => {
     setLoadingVideos(true);
     try {
       // Guide video search
@@ -52,7 +45,14 @@ function ChampionDetails({ championName, myChampionName }) {
     } finally {
       setLoadingVideos(false);
     }
-  };
+  }, [championName, myChampionName]);
+
+  useEffect(() => {
+    if (championName) {
+      fetchAbilities();
+      fetchVideos();
+    }
+  }, [championName, fetchAbilities, fetchVideos]);
 
   const renderVideoContainer = (title, video, loading) => (
     // do not display the title anymore

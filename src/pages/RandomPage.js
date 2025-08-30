@@ -44,18 +44,12 @@ function RandomPage() {
   const [randomChampion, setRandomChampion] = useState('');
   const [learningRange, setLearningRange] = useState({ min: 0, max: 0 });
 
-  // Initialize
-  useEffect(() => {
-    loadChampions();
-    updateLearningRange();
-  }, []);
-
   // Update learning range when needed
   const updateLearningRange = useCallback(() => {
     setLearningRange(getLearningRange());
   }, []);
 
-  const loadChampions = async () => {
+  const loadChampions = useCallback(async () => {
     try {
       const version = await fetchDataDragonVersion();
       const championsData = await fetchChampionData(version);
@@ -72,7 +66,13 @@ function RandomPage() {
     } catch (error) {
       console.error('Error loading champions:', error);
     }
-  };
+  }, []);
+
+  // Initialize
+  useEffect(() => {
+    loadChampions();
+    updateLearningRange();
+  }, [loadChampions, updateLearningRange]);
 
   const getRandomChampion = () => {
     if (champions.length === 0) return;

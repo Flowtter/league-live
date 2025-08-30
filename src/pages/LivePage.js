@@ -51,11 +51,6 @@ function LivePage() {
   const [learningRange, setLearningRange] = useState({ min: 0, max: 0 });
 
   // Initialize
-  useEffect(() => {
-    loadAccountsFromStorage();
-    loadDataDragonVersion();
-  }, []);
-
   // Update learning range based on current game champions only
   const updateLearningRange = useCallback(() => {
     if (!liveGame) {
@@ -74,11 +69,7 @@ function LivePage() {
     setLearningRange({ min, max });
   }, [liveGame]);
 
-  useEffect(() => {
-    updateLearningRange();
-  }, [updateLearningRange, liveGame]);
-
-  const loadAccountsFromStorage = () => {
+  const loadAccountsFromStorage = useCallback(() => {
     const loadedAccounts = getAccounts();
     setAccounts(loadedAccounts);
     
@@ -87,9 +78,9 @@ function LivePage() {
       setSelectedAccount(lastSelected);
       fetchLiveGameData(lastSelected);
     }
-  };
+  }, []);
 
-  const loadDataDragonVersion = async () => {
+  const loadDataDragonVersion = useCallback(async () => {
     try {
       const version = await fetchDataDragonVersion();
       setDdVersion(version);
@@ -97,7 +88,16 @@ function LivePage() {
       console.error('Error loading Data Dragon version:', error);
       setDdVersion('13.24.1'); // Fallback
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadAccountsFromStorage();
+    loadDataDragonVersion();
+  }, [loadAccountsFromStorage, loadDataDragonVersion]);
+
+  useEffect(() => {
+    updateLearningRange();
+  }, [updateLearningRange, liveGame]);
 
   const showError = (message, duration = 5000) => {
     setError(message);
