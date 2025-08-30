@@ -74,7 +74,7 @@ export async function fetchLiveGame(accountName) {
   };
 
   try {
-    const response = await axios.post('https://u.gg/api', payload, { headers });
+    const response = await axios.post('https://cors-anywhere.com/https://u.gg/api', payload, { headers });
 
     if (response.data.errors) {
       throw new Error(response.data.errors[0].message);
