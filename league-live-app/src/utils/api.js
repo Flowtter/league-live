@@ -161,14 +161,9 @@ export async function fetchLiveGame(accountName) {
 
 // YouTube search API using youtube-v3-api package (v1.1.1)
 export async function searchYouTubeVideos(query, maxResults = 5) {
-  try {
-    if (!process.env.REACT_APP_YOUTUBE_API_KEY) {
-      console.warn('YouTube API key not configured');
-      return [];
-    }
-
+  const trySearch = async (apiKey) => {
     const { YoutubeDataAPI } = await import('youtube-v3-api');
-    const api = new YoutubeDataAPI(process.env.REACT_APP_YOUTUBE_API_KEY);
+    const api = new YoutubeDataAPI(apiKey);
     
     const response = await api.searchAll(query, maxResults);
     
@@ -183,63 +178,105 @@ export async function searchYouTubeVideos(query, maxResults = 5) {
         channelId: item.snippet.channelId,
         channelTitle: item.snippet.channelTitle
       }));
+  };
+
+  try {
+    if (!process.env.REACT_APP_YOUTUBE_API_KEY && !process.env.REACT_APP_YOUTUBE_API_KEY_BACKUP) {
+      console.warn('YouTube API keys not configured');
+      return [];
+    }
+
+    // Try main API key first
+    if (process.env.REACT_APP_YOUTUBE_API_KEY) {
+      try {
+        return await trySearch(process.env.REACT_APP_YOUTUBE_API_KEY);
+      } catch (error) {
+        console.warn('Main YouTube API key failed, trying backup:', error.message);
+      }
+    }
+
+    // Fallback to backup API key
+    if (process.env.REACT_APP_YOUTUBE_API_KEY_BACKUP) {
+      try {
+        return await trySearch(process.env.REACT_APP_YOUTUBE_API_KEY_BACKUP);
+      } catch (error) {
+        console.error('Backup YouTube API key also failed:', error.message);
+      }
+    }
+
+    return [];
   } catch (error) {
     console.error('Error searching YouTube:', error);
     return [];
   }
 }
 
-// Champion abilities from BigBrain API
+// Champion abilities from BigBrain API (with proper champion ID lookup)
 export async function fetchChampionAbilities(championName) {
   try {
-    const response = await axios.get(`https://api.bigbrain.gg/api/champions/${championName.toLowerCase()}`);
-    const champion = response.data;
+    // First, get the champion ID (key) from Data Dragon
+    const version = await fetchDataDragonVersion();
+    const champions = await fetchChampionData(version);
     
-    if (!champion || !champion.abilities) {
-      throw new Error('Champion abilities not found');
+    // Find the champion ID (key) from the name
+    let championId = null;
+    for (const [champKey, champData] of Object.entries(champions)) {
+      if (champData.name.toLowerCase() === championName.toLowerCase()) {
+        championId = champKey;
+        break;
+      }
+    }
+    
+    if (!championId) {
+      throw new Error('Champion not found');
     }
 
-    const abilities = [];
-    
-    // Passive
-    if (champion.abilities.passive) {
-      abilities.push({
-        key: 'P',
-        name: champion.abilities.passive.name || 'Passive',
-        description: champion.abilities.passive.description || '',
-        iconUrl: `https://ddragon.leagueoflegends.com/cdn/13.24.1/img/passive/${champion.abilities.passive.image || 'default.png'}`,
-        cooldowns: ['Passive']
-      });
-    }
-
-    // Q, W, E, R abilities
-    ['q', 'w', 'e', 'r'].forEach((key) => {
-      const ability = champion.abilities[key];
-      if (ability) {
+    // Try BigBrain API first (cleaner descriptions)
+    try {
+      const response = await axios.get(`https://static.bigbrain.gg/assets/lol/riot_static/${version}/data/en_US/champion/${championId}.json`);
+      const championData = response.data.data[championId];
+      
+      const abilities = [];
+      
+      // Passive
+      if (championData.passive) {
         abilities.push({
-          key: key.toUpperCase(),
-          name: ability.name || `${key.toUpperCase()} Ability`,
-          description: ability.description || '',
-          iconUrl: `https://ddragon.leagueoflegends.com/cdn/13.24.1/img/spell/${ability.image || 'default.png'}`,
-          cooldowns: ability.cooldown || ['?', '?', '?', '?', '?']
+          key: 'P',
+          name: championData.passive.name,
+          description: championData.passive.description || '',
+          iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/passive/${championData.passive.image.full}`,
+          cooldowns: ['Passive']
         });
       }
-    });
 
-    return abilities;
+      // Q, W, E, R abilities
+      const spellKeys = ['Q', 'W', 'E', 'R'];
+      championData.spells.forEach((spell, index) => {
+        abilities.push({
+          key: spellKeys[index],
+          name: spell.name,
+          description: spell.description, // Keep HTML from BigBrain
+          iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${spell.image.full}`,
+          cooldowns: spell.cooldown
+        });
+      });
+
+      return abilities;
+    } catch (bigBrainError) {
+      // Fallback to Data Dragon
+      return await fetchAbilitiesFromDataDragon(championId, version);
+    }
   } catch (error) {
     console.error('Error fetching champion abilities:', error);
-    // Fallback to Data Dragon
-    return await fetchAbilitiesFromDataDragon(championName);
+    throw error;
   }
 }
 
 // Fallback to Data Dragon for abilities
-async function fetchAbilitiesFromDataDragon(championName) {
+async function fetchAbilitiesFromDataDragon(championId, version) {
   try {
-    const version = await fetchDataDragonVersion();
-    const response = await axios.get(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion/${championName}.json`);
-    const champion = response.data.data[championName];
+    const response = await axios.get(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion/${championId}.json`);
+    const champion = response.data.data[championId];
     
     if (!champion) {
       throw new Error('Champion not found');
@@ -252,19 +289,19 @@ async function fetchAbilitiesFromDataDragon(championName) {
       abilities.push({
         key: 'P',
         name: champion.passive.name,
-        description: champion.passive.description.replace(/<[^>]*>/g, '').replace(/\\{\\{[^}]*\\}\\}/g, '[VALUE]'),
+        description: champion.passive.description.replace(/\{\{[^}]*\}\}/g, '[VALUE]'), // Keep HTML, remove mustache
         iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/passive/${champion.passive.image.full}`,
         cooldowns: ['Passive']
       });
     }
 
     // Q, W, E, R abilities
+    const spellKeys = ['Q', 'W', 'E', 'R'];
     champion.spells.forEach((spell, index) => {
-      const keys = ['Q', 'W', 'E', 'R'];
       abilities.push({
-        key: keys[index],
+        key: spellKeys[index],
         name: spell.name,
-        description: spell.description.replace(/<[^>]*>/g, '').replace(/\\{\\{[^}]*\\}\\}/g, '[VALUE]'),
+        description: spell.tooltip.replace(/\{\{[^}]*\}\}/g, '[VALUE]'), // Keep HTML, remove mustache
         iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${spell.image.full}`,
         cooldowns: spell.cooldownBurn ? spell.cooldownBurn.split('/') : ['?', '?', '?', '?', '?']
       });

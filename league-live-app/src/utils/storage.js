@@ -77,8 +77,10 @@ export function getLearningRange() {
 }
 
 export function getLearningBadgeColor(count, min, max) {
+  console.log({count, min, max});
   if (count === 0) return '#666666'; // Gray for 0
   if (max === min) return '#2ecc71'; // Green if only one value
+  if (max === min && max === 1) return '#2ecc71'; // Green if only one value
   
   // Interpolate from red (#e74c3c) to green (#2ecc71)
   const ratio = (count - min) / (max - min);
