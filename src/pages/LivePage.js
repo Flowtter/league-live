@@ -2,16 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { fetchLiveGame, fetchDataDragonVersion } from '../utils/api';
 import ChampionDetails from '../components/ChampionDetails';
-import { 
-  getAccounts, 
-  saveAccount, 
-  deleteAccount, 
-  getLastSelectedAccount, 
+import {
+  getAccounts,
+  saveAccount,
+  deleteAccount,
+  getLastSelectedAccount,
   setLastSelectedAccount,
   getChampionLearningCount,
   incrementChampionLearning,
   decrementChampionLearning,
-  getLearningBadgeColor
+  getLearningBadgeColor,
 } from '../utils/storage';
 
 function Navigation() {
@@ -19,22 +19,16 @@ function Navigation() {
 
   return (
     <div className="nav-menu">
-      <Link 
-        to="/live" 
+      <Link
+        to="/live"
         className={`nav-link ${location.pathname === '/live' || location.pathname === '/' ? 'active' : ''}`}
       >
         Live
       </Link>
-      <Link 
-        to="/learn" 
-        className={`nav-link ${location.pathname === '/learn' ? 'active' : ''}`}
-      >
+      <Link to="/learn" className={`nav-link ${location.pathname === '/learn' ? 'active' : ''}`}>
         Learn
       </Link>
-      <Link 
-        to="/random" 
-        className={`nav-link ${location.pathname === '/random' ? 'active' : ''}`}
-      >
+      <Link to="/random" className={`nav-link ${location.pathname === '/random' ? 'active' : ''}`}>
         Random
       </Link>
     </div>
@@ -61,18 +55,18 @@ function LivePage() {
     // Get learning scores for all champions in the current game
     const allPlayers = [...liveGame.allyTeam, ...liveGame.enemyTeam];
     const scores = allPlayers.map(player => getChampionLearningCount(player.championName));
-    
+
     // Calculate local min/max for the current game
     const min = Math.min(...scores);
     const max = Math.max(...scores);
-    
+
     setLearningRange({ min, max });
   }, [liveGame]);
 
   const loadAccountsFromStorage = useCallback(() => {
     const loadedAccounts = getAccounts();
     setAccounts(loadedAccounts);
-    
+
     const lastSelected = getLastSelectedAccount();
     if (lastSelected && loadedAccounts.find(acc => acc.name === lastSelected)) {
       setSelectedAccount(lastSelected);
@@ -104,14 +98,14 @@ function LivePage() {
     setTimeout(() => setError(''), duration);
   };
 
-  const fetchLiveGameData = async (accountName) => {
+  const fetchLiveGameData = async accountName => {
     if (!accountName) return;
-    
+
     try {
       setError('');
       const gameData = await fetchLiveGame(accountName);
       setLiveGame(gameData);
-      
+
       // Auto-select first ally if none selected
       if (!selectedChampionId && gameData.allyTeam.length > 0) {
         selectChampion(gameData.allyTeam[0].championId);
@@ -128,30 +122,30 @@ function LivePage() {
     }
   };
 
-  const selectChampion = (championId) => {
+  const selectChampion = championId => {
     setSelectedChampionId(championId);
   };
 
-  const getChampionNameById = (championId) => {
+  const getChampionNameById = championId => {
     if (!liveGame) return null;
-    
+
     const allPlayers = [...liveGame.allyTeam, ...liveGame.enemyTeam];
     if (liveGame.myChampion && championId === liveGame.myChampion.id) {
       return liveGame.myChampion.name;
     }
-    
+
     const player = allPlayers.find(p => p.championId === championId);
     return player ? player.championName : null;
   };
 
-  const getChampionIconUrl = (championKey) => {
+  const getChampionIconUrl = championKey => {
     if (!championKey || !ddVersion) {
       return `https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/Aatrox.png`;
     }
     return `https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/champion/${championKey}.png`;
   };
 
-  const handleAccountChange = (e) => {
+  const handleAccountChange = e => {
     const accountName = e.target.value;
     setSelectedAccount(accountName);
     if (accountName) {
@@ -179,7 +173,7 @@ function LivePage() {
       showError('Please select an account to delete');
       return;
     }
-    
+
     if (window.confirm(`Delete account "${selectedAccount}"?`)) {
       deleteAccount(selectedAccount);
       setAccounts(getAccounts());
@@ -191,7 +185,7 @@ function LivePage() {
 
   const handleLearntChampion = () => {
     if (!selectedChampionId) return;
-    
+
     const championName = getChampionNameById(selectedChampionId);
     if (championName) {
       incrementChampionLearning(championName);
@@ -201,7 +195,7 @@ function LivePage() {
 
   const handleForgotChampion = () => {
     if (!selectedChampionId) return;
-    
+
     const championName = getChampionNameById(selectedChampionId);
     if (championName) {
       decrementChampionLearning(championName);
@@ -214,14 +208,14 @@ function LivePage() {
     const isSelected = selectedChampionId === player.championId;
     const learningCount = getChampionLearningCount(player.championName);
     const badgeColor = getLearningBadgeColor(learningCount, learningRange.min, learningRange.max);
-    
+
     let championKey = player.championKey;
     if (isMyChampion && liveGame.myChampion.key) {
       championKey = liveGame.myChampion.key;
     }
 
     return (
-      <div 
+      <div
         key={player.championId}
         className={`champion-item ${isSelected ? 'selected' : ''} ${isMyChampion ? 'my-champion' : ''}`}
         onClick={() => selectChampion(player.championId)}
@@ -231,11 +225,11 @@ function LivePage() {
           src={getChampionIconUrl(championKey)}
           alt={player.championName}
         />
-        <div 
+        <div
           className="learning-badge"
           style={{
             backgroundColor: badgeColor,
-            color: learningCount === 0 ? '#ffffff' : '#000000'
+            color: learningCount === 0 ? '#ffffff' : '#000000',
           }}
         >
           {learningCount}
@@ -248,18 +242,14 @@ function LivePage() {
 
   return (
     <div>
-      {error && (
-        <div className="error-banner">
-          {error}
-        </div>
-      )}
-      
+      {error && <div className="error-banner">{error}</div>}
+
       <div className="top-menubar">
         <Navigation />
         <div className="menu-controls">
-          <select 
-            className="accounts-dropdown" 
-            value={selectedAccount} 
+          <select
+            className="accounts-dropdown"
+            value={selectedAccount}
             onChange={handleAccountChange}
           >
             <option value="">Select Account...</option>
@@ -269,20 +259,20 @@ function LivePage() {
               </option>
             ))}
           </select>
-          
+
           <button className="btn" onClick={handleAddAccount}>
             Add Account
           </button>
-          
+
           <button className="btn btn-danger" onClick={handleDeleteAccount}>
             Delete Account
           </button>
-          
+
           <button className="btn" onClick={() => fetchLiveGameData(selectedAccount)}>
             Refresh
           </button>
         </div>
-        
+
         <div className="learning-controls">
           <button className="btn btn-success" onClick={handleLearntChampion}>
             Learnt
@@ -301,8 +291,8 @@ function LivePage() {
         </div>
 
         <div className="center">
-          <ChampionDetails 
-            championName={selectedChampionName} 
+          <ChampionDetails
+            championName={selectedChampionName}
             myChampionName={liveGame?.myChampion?.name}
           />
         </div>

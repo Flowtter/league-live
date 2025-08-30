@@ -27,17 +27,17 @@ function ChampionDetails({ championName, myChampionName }) {
       // Guide video search
       const guideQuery = `${championName} guide abilities League of Legends`;
       const guideResults = await searchYouTubeVideos(guideQuery, 3);
-      
+
       // Matchup video search (if we have a myChampion)
       let matchupResults = [];
       if (myChampionName) {
         const matchupQuery = `${myChampionName} vs ${championName} matchup League of Legends`;
         matchupResults = await searchYouTubeVideos(matchupQuery, 3);
       }
-      
+
       setVideos({
         guide: guideResults.length > 0 ? guideResults[0] : null,
-        matchup: matchupResults.length > 0 ? matchupResults[0] : null
+        matchup: matchupResults.length > 0 ? matchupResults[0] : null,
       });
     } catch (error) {
       console.error('Error fetching videos:', error);
@@ -67,7 +67,17 @@ function ChampionDetails({ championName, myChampionName }) {
           height="100%"
         />
       ) : (
-        <div style={{ flex: 1, backgroundColor: '#1a252f', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#95a5a6' }}>
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: '#1a252f',
+            borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#95a5a6',
+          }}
+        >
           No video found
         </div>
       )}
@@ -76,7 +86,11 @@ function ChampionDetails({ championName, myChampionName }) {
 
   const renderAbilities = () => {
     if (loadingAbilities) {
-      return <div className="loading" style={{ gridColumn: '1 / -1', height: '100px' }}>Loading abilities...</div>;
+      return (
+        <div className="loading" style={{ gridColumn: '1 / -1', height: '100px' }}>
+          Loading abilities...
+        </div>
+      );
     }
 
     return abilities.map((ability, index) => (
@@ -87,10 +101,12 @@ function ChampionDetails({ championName, myChampionName }) {
           <span className="ability-name">{ability.name}</span>
         </div>
         <div className="ability-cooldowns">
-          {Array.isArray(ability.cooldowns) ? ability.cooldowns.join(' / ') + 's' : ability.cooldowns}
+          {Array.isArray(ability.cooldowns)
+            ? ability.cooldowns.join(' / ') + 's'
+            : ability.cooldowns}
         </div>
-        <div 
-          className="ability-description" 
+        <div
+          className="ability-description"
           dangerouslySetInnerHTML={{ __html: ability.description }}
         />
       </div>
@@ -120,9 +136,7 @@ function ChampionDetails({ championName, myChampionName }) {
 
       <div className="abilities-section">
         <br />
-        <div className="abilities-container">
-          {renderAbilities()}
-        </div>
+        <div className="abilities-container">{renderAbilities()}</div>
       </div>
     </div>
   );

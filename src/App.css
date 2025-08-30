@@ -94,7 +94,8 @@ body {
   min-height: calc(100vh - 60px);
 }
 
-.menu-left, .menu-right {
+.menu-left,
+.menu-right {
   width: 80px;
   background-color: #2c3e50;
   border-right: 1px solid #34495e;
@@ -142,7 +143,7 @@ body {
 
 .champion-item.selected {
   background-color: #f1c40f33;
-  border-color:  #f1c40f;
+  border-color: #f1c40f;
 }
 
 .champion-item.my-champion .champion-portrait {
@@ -354,8 +355,12 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Learn Page Styles */

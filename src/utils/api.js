@@ -10,27 +10,27 @@ const isExpired = (timestamp, ttlMs) => Date.now() - timestamp > ttlMs;
 const getFromCache = (key, ttlMs) => {
   const cached = cache.get(key);
   if (!cached) return null;
-  
+
   if (isExpired(cached.timestamp, ttlMs)) {
     cache.delete(key);
     return null;
   }
-  
+
   return cached.data;
 };
 
 const setCache = (key, data) => {
   cache.set(key, {
     data,
-    timestamp: Date.now()
+    timestamp: Date.now(),
   });
 };
 
 // Cache TTLs
 const CACHE_TTL = {
-  UGG: 60 * 1000,        // 1 minute for u.gg
-  YOUTUBE: 24 * 60 * 60 * 1000,  // 24 hours for YouTube
-  DATA_DRAGON: 60 * 60 * 1000    // 1 hour for Data Dragon
+  UGG: 60 * 1000, // 1 minute for u.gg
+  YOUTUBE: 24 * 60 * 60 * 1000, // 24 hours for YouTube
+  DATA_DRAGON: 60 * 60 * 1000, // 1 hour for Data Dragon
 };
 
 // Data Dragon API utilities
@@ -56,7 +56,9 @@ export async function fetchChampionData(version) {
   if (cached) return cached;
 
   try {
-    const response = await axios.get(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`);
+    const response = await axios.get(
+      `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`
+    );
     const data = response.data.data;
     setCache(cacheKey, data);
     return data;
@@ -73,7 +75,7 @@ export async function fetchLiveGame(accountName) {
   if (cached) return cached;
 
   const [gameName, tagLine] = accountName.split('#');
-  
+
   const query = `
     query GetLiveGame($regionId: String!, $riotUserName: String!, $riotTagLine: String!) {
       getLiveGame(regionId: $regionId, riotUserName: $riotUserName, riotTagLine: $riotTagLine) {
@@ -97,33 +99,36 @@ export async function fetchLiveGame(accountName) {
   `;
 
   const payload = {
-    operationName: "GetLiveGame",
+    operationName: 'GetLiveGame',
     variables: {
       riotUserName: gameName,
       riotTagLine: tagLine,
-      regionId: "euw1"
+      regionId: 'euw1',
     },
-    query
+    query,
   };
 
   const headers = {
-    'accept': '*/*',
+    accept: '*/*',
     'accept-language': 'en-US,en;q=0.9',
     'content-type': 'application/json',
-    'origin': 'https://u.gg',
-    'referer': `https://u.gg/lol/profile/euw1/${gameName}-${tagLine.toLowerCase()}/live-game`,
+    origin: 'https://u.gg',
+    referer: `https://u.gg/lol/profile/euw1/${gameName}-${tagLine.toLowerCase()}/live-game`,
     'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
     'sec-ch-ua-mobile': '?0',
     'sec-ch-ua-platform': '"macOS"',
     'sec-fetch-dest': 'empty',
     'sec-fetch-mode': 'cors',
     'sec-fetch-site': 'same-origin',
-    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
-    'x-app-type': 'web'
+    'user-agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+    'x-app-type': 'web',
   };
 
   try {
-    const response = await axios.post('https://cors-anywhere.com/https://u.gg/api', payload, { headers });
+    const response = await axios.post('https://cors-anywhere.com/https://u.gg/api', payload, {
+      headers,
+    });
 
     if (response.data.errors) {
       throw new Error(response.data.errors[0].message);
@@ -136,9 +141,10 @@ export async function fetchLiveGame(accountName) {
 
     // Combine teams and find current player
     const allPlayers = [...liveGame.teamA, ...liveGame.teamB];
-    const currentPlayer = allPlayers.find(p => 
-      p.riotUserName.toLowerCase() === gameName.toLowerCase() && 
-      p.riotTagLine.toLowerCase() === tagLine.toLowerCase()
+    const currentPlayer = allPlayers.find(
+      p =>
+        p.riotUserName.toLowerCase() === gameName.toLowerCase() &&
+        p.riotTagLine.toLowerCase() === tagLine.toLowerCase()
     );
 
     if (!currentPlayer) {
@@ -151,17 +157,19 @@ export async function fetchLiveGame(accountName) {
     const enemyTeamRaw = isTeamA ? liveGame.teamB : liveGame.teamA;
 
     // Role order mapping (matching FastAPI version)
-    const roleOrder = { "top": 1, "jungle": 2, "mid": 3, "adc": 4, "supp": 5 };
+    const roleOrder = { top: 1, jungle: 2, mid: 3, adc: 4, supp: 5 };
 
     // Sort teams by role (include current player in ally team like Python version)
-    const sortByRole = (a, b) => (roleOrder[a.currentRole?.toLowerCase()] || 5) - (roleOrder[b.currentRole?.toLowerCase()] || 5);
+    const sortByRole = (a, b) =>
+      (roleOrder[a.currentRole?.toLowerCase()] || 5) -
+      (roleOrder[b.currentRole?.toLowerCase()] || 5);
     allyTeamRaw.sort(sortByRole);
     enemyTeamRaw.sort(sortByRole);
 
     // We need to get champion data to convert IDs to names
     const champions = await fetchChampionData(await fetchDataDragonVersion());
-    
-    const getChampionInfo = (championId) => {
+
+    const getChampionInfo = championId => {
       for (const [key, champ] of Object.entries(champions)) {
         if (parseInt(champ.key) === championId) {
           return { name: champ.name, key: key };
@@ -176,7 +184,7 @@ export async function fetchLiveGame(accountName) {
       myChampion: {
         id: currentPlayer.championId,
         name: myChampionInfo.name,
-        key: myChampionInfo.key
+        key: myChampionInfo.key,
       },
       allyTeam: allyTeamRaw.map(p => {
         const champInfo = getChampionInfo(p.championId);
@@ -185,7 +193,7 @@ export async function fetchLiveGame(accountName) {
           championName: champInfo.name,
           championKey: champInfo.key,
           summonerName: `${p.riotUserName}#${p.riotTagLine}`,
-          role: p.currentRole
+          role: p.currentRole,
         };
       }),
       enemyTeam: enemyTeamRaw.map(p => {
@@ -195,11 +203,11 @@ export async function fetchLiveGame(accountName) {
           championName: champInfo.name,
           championKey: champInfo.key,
           summonerName: `${p.riotUserName}#${p.riotTagLine}`,
-          role: p.currentRole
+          role: p.currentRole,
         };
-      })
+      }),
     };
-    
+
     setCache(cacheKey, result);
     return result;
   } catch (error) {
@@ -216,12 +224,12 @@ export async function searchYouTubeVideos(query, maxResults = 5) {
   const cacheKey = getCacheKey('youtube', query, maxResults);
   const cached = getFromCache(cacheKey, CACHE_TTL.YOUTUBE);
   if (cached) return cached;
-  const trySearch = async (apiKey) => {
+  const trySearch = async apiKey => {
     const { YoutubeDataAPI } = await import('youtube-v3-api');
     const api = new YoutubeDataAPI(apiKey);
-    
+
     const response = await api.searchAll(query, maxResults);
-    
+
     return response.items
       .filter(item => item.id && item.id.kind === 'youtube#video')
       .map(item => ({
@@ -231,7 +239,7 @@ export async function searchYouTubeVideos(query, maxResults = 5) {
         thumbnail: item.snippet.thumbnails?.default?.url,
         publishedAt: item.snippet.publishedAt,
         channelId: item.snippet.channelId,
-        channelTitle: item.snippet.channelTitle
+        channelTitle: item.snippet.channelTitle,
       }));
   };
 
@@ -282,7 +290,7 @@ export async function fetchChampionAbilities(championName) {
     // First, get the champion ID (key) from Data Dragon
     const version = await fetchDataDragonVersion();
     const champions = await fetchChampionData(version);
-    
+
     // Find the champion ID (key) from the name
     let championId = null;
     for (const [champKey, champData] of Object.entries(champions)) {
@@ -291,18 +299,20 @@ export async function fetchChampionAbilities(championName) {
         break;
       }
     }
-    
+
     if (!championId) {
       throw new Error('Champion not found');
     }
 
     // Try BigBrain API first (cleaner descriptions)
     try {
-      const response = await axios.get(`https://static.bigbrain.gg/assets/lol/riot_static/${version}/data/en_US/champion/${championId}.json`);
+      const response = await axios.get(
+        `https://static.bigbrain.gg/assets/lol/riot_static/${version}/data/en_US/champion/${championId}.json`
+      );
       const championData = response.data.data[championId];
-      
+
       const abilities = [];
-      
+
       // Passive
       if (championData.passive) {
         abilities.push({
@@ -310,7 +320,7 @@ export async function fetchChampionAbilities(championName) {
           name: championData.passive.name,
           description: championData.passive.description || '',
           iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/passive/${championData.passive.image.full}`,
-          cooldowns: ['Passive']
+          cooldowns: ['Passive'],
         });
       }
 
@@ -322,7 +332,7 @@ export async function fetchChampionAbilities(championName) {
           name: spell.name,
           description: spell.description, // Keep HTML from BigBrain
           iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${spell.image.full}`,
-          cooldowns: spell.cooldown
+          cooldowns: spell.cooldown,
         });
       });
 
@@ -343,15 +353,17 @@ export async function fetchChampionAbilities(championName) {
 // Fallback to Data Dragon for abilities
 async function fetchAbilitiesFromDataDragon(championId, version) {
   try {
-    const response = await axios.get(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion/${championId}.json`);
+    const response = await axios.get(
+      `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion/${championId}.json`
+    );
     const champion = response.data.data[championId];
-    
+
     if (!champion) {
       throw new Error('Champion not found');
     }
 
     const abilities = [];
-    
+
     // Passive
     if (champion.passive) {
       abilities.push({
@@ -359,7 +371,7 @@ async function fetchAbilitiesFromDataDragon(championId, version) {
         name: champion.passive.name,
         description: champion.passive.description.replace(/\{\{[^}]*\}\}/g, '[VALUE]'), // Keep HTML, remove mustache
         iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/passive/${champion.passive.image.full}`,
-        cooldowns: ['Passive']
+        cooldowns: ['Passive'],
       });
     }
 
@@ -371,7 +383,7 @@ async function fetchAbilitiesFromDataDragon(championId, version) {
         name: spell.name,
         description: spell.tooltip.replace(/\{\{[^}]*\}\}/g, '[VALUE]'), // Keep HTML, remove mustache
         iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${spell.image.full}`,
-        cooldowns: spell.cooldownBurn ? spell.cooldownBurn.split('/') : ['?', '?', '?', '?', '?']
+        cooldowns: spell.cooldownBurn ? spell.cooldownBurn.split('/') : ['?', '?', '?', '?', '?'],
       });
     });
 

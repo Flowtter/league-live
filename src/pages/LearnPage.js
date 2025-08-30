@@ -3,12 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { fetchDataDragonVersion, fetchChampionData } from '../utils/api';
 import ChampionDetails from '../components/ChampionDetails';
 import ChampionDropdown from '../components/ChampionDropdown';
-import { 
+import {
   getChampionLearningCount,
   incrementChampionLearning,
   decrementChampionLearning,
   getLearningRange,
-  getLearningBadgeColor
+  getLearningBadgeColor,
 } from '../utils/storage';
 
 function Navigation() {
@@ -16,22 +16,16 @@ function Navigation() {
 
   return (
     <div className="nav-menu">
-      <Link 
-        to="/live" 
+      <Link
+        to="/live"
         className={`nav-link ${location.pathname === '/live' || location.pathname === '/' ? 'active' : ''}`}
       >
         Live
       </Link>
-      <Link 
-        to="/learn" 
-        className={`nav-link ${location.pathname === '/learn' ? 'active' : ''}`}
-      >
+      <Link to="/learn" className={`nav-link ${location.pathname === '/learn' ? 'active' : ''}`}>
         Learn
       </Link>
-      <Link 
-        to="/random" 
-        className={`nav-link ${location.pathname === '/random' ? 'active' : ''}`}
-      >
+      <Link to="/random" className={`nav-link ${location.pathname === '/random' ? 'active' : ''}`}>
         Random
       </Link>
     </div>
@@ -74,21 +68,23 @@ function LearnPage() {
     try {
       const version = await fetchDataDragonVersion();
       const championsData = await fetchChampionData(version);
-      
+
       // Convert to array and sort alphabetically
-      const championsList = Object.entries(championsData).map(([key, champion]) => ({
-        id: parseInt(champion.key),
-        name: champion.name,
-        key: key
-      })).sort((a, b) => a.name.localeCompare(b.name));
-      
+      const championsList = Object.entries(championsData)
+        .map(([key, champion]) => ({
+          id: parseInt(champion.key),
+          name: champion.name,
+          key: key,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
       setChampions(championsList);
     } catch (error) {
       console.error('Error loading champions:', error);
     }
   };
 
-  const getChampionIconUrl = (championKey) => {
+  const getChampionIconUrl = championKey => {
     if (!championKey || !ddVersion) {
       return `https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/Aatrox.png`;
     }
@@ -97,25 +93,25 @@ function LearnPage() {
 
   const handleLearntChampion = () => {
     if (!selectedLearnChampion) return;
-    
+
     incrementChampionLearning(selectedLearnChampion);
     updateLearningRange();
   };
 
   const handleForgotChampion = () => {
     if (!selectedLearnChampion) return;
-    
+
     decrementChampionLearning(selectedLearnChampion);
     updateLearningRange();
   };
 
-  const createChampionItem = (champion) => {
+  const createChampionItem = champion => {
     const isSelected = selectedLearnChampion === champion.name;
     const learningCount = getChampionLearningCount(champion.name);
     const badgeColor = getLearningBadgeColor(learningCount, learningRange.min, learningRange.max);
 
     return (
-      <div 
+      <div
         key={champion.id}
         className={`champion-item ${isSelected ? 'selected' : ''}`}
         onClick={() => setSelectedLearnChampion(champion.name)}
@@ -125,11 +121,11 @@ function LearnPage() {
           src={getChampionIconUrl(champion.key)}
           alt={champion.name}
         />
-        <div 
+        <div
           className="learning-badge"
           style={{
             backgroundColor: badgeColor,
-            color: learningCount === 0 ? '#ffffff' : '#000000'
+            color: learningCount === 0 ? '#ffffff' : '#000000',
           }}
         >
           {learningCount}
@@ -143,13 +139,13 @@ function LearnPage() {
       <div className="top-menubar">
         <Navigation />
         <div className="menu-controls">
-          <ChampionDropdown 
+          <ChampionDropdown
             selectedChampion={selectedMyChampion}
             onChampionChange={setSelectedMyChampion}
             placeholder="Select Your Champion..."
           />
         </div>
-        
+
         <div className="learning-controls">
           <button className="btn btn-success" onClick={handleLearntChampion}>
             Learnt
@@ -166,8 +162,8 @@ function LearnPage() {
         </div>
 
         <div className="learn-details">
-          <ChampionDetails 
-            championName={selectedLearnChampion} 
+          <ChampionDetails
+            championName={selectedLearnChampion}
             myChampionName={selectedMyChampion}
           />
         </div>

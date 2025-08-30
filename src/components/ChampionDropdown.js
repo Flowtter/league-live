@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { fetchDataDragonVersion, fetchChampionData } from '../utils/api';
 
-function ChampionDropdown({ selectedChampion, onChampionChange, placeholder = "Select Champion..." }) {
+function ChampionDropdown({
+  selectedChampion,
+  onChampionChange,
+  placeholder = 'Select Champion...',
+}) {
   const [champions, setChampions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -13,12 +17,12 @@ function ChampionDropdown({ selectedChampion, onChampionChange, placeholder = "S
     try {
       const version = await fetchDataDragonVersion();
       const championsData = await fetchChampionData(version);
-      
+
       // Convert to array and sort alphabetically
-      const championsList = Object.values(championsData).sort((a, b) => 
+      const championsList = Object.values(championsData).sort((a, b) =>
         a.name.localeCompare(b.name)
       );
-      
+
       setChampions(championsList);
     } catch (error) {
       console.error('Error loading champions:', error);
@@ -36,10 +40,10 @@ function ChampionDropdown({ selectedChampion, onChampionChange, placeholder = "S
   }
 
   return (
-    <select 
-      className="accounts-dropdown" 
-      value={selectedChampion || ''} 
-      onChange={(e) => onChampionChange(e.target.value)}
+    <select
+      className="accounts-dropdown"
+      value={selectedChampion || ''}
+      onChange={e => onChampionChange(e.target.value)}
     >
       <option value="">{placeholder}</option>
       {champions.map(champion => (
