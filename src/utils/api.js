@@ -393,3 +393,83 @@ async function fetchAbilitiesFromDataDragon(championId, version) {
     throw error;
   }
 }
+
+// Skill order from leagueofgraphs.com with retry
+export async function fetchSkillOrder(championName) {
+  const cacheKey = getCacheKey('skill_order', championName);
+  const cached = getFromCache(cacheKey, CACHE_TTL.DATA_DRAGON);
+  if (cached) return cached;
+
+  const maxRetries = 2;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const url = `https://cors-anywhere.com/https://www.leagueofgraphs.com/champions/skills-orders/${championName.toLowerCase().replace(/[^a-z]/g, '')}`;
+
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+      });
+
+      const skillOrder = parseSkillOrder(response.data);
+      setCache(cacheKey, skillOrder);
+      return skillOrder;
+    } catch (error) {
+      console.warn(`Skill order fetch attempt ${attempt} failed:`, error.message);
+
+      if (attempt === maxRetries) {
+        console.error('All skill order fetch attempts failed');
+        const emptyResult = [];
+        setCache(cacheKey, emptyResult);
+        return emptyResult;
+      }
+
+      // Wait 1 second before retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+}
+
+function parseSkillOrder(htmlContent) {
+  const skillOrder = new Array(18).fill('');
+
+  // Extract only the first 18 active skill cells (first/most popular build)
+  const allActiveCells = [];
+  let cellIndex = 0;
+  let activeCellCount = 0;
+
+  // Find all skillCell elements (both active and inactive)
+  const allCellMatches = htmlContent.matchAll(/<td class="skillCell[^"]*"[^>]*>([\s\S]*?)<\/td>/g);
+
+  for (const match of allCellMatches) {
+    const cellContent = match[1].trim();
+    const isActive = match[0].includes('active');
+
+    if (isActive && ['Q', 'W', 'E', 'R'].includes(cellContent)) {
+      // Only take the first 18 active cells
+      if (activeCellCount < 18) {
+        allActiveCells.push({
+          skill: cellContent,
+          position: cellIndex % 18, // Each skill has 18 columns
+        });
+        activeCellCount++;
+      } else {
+        break; // Stop after finding 18 active cells
+      }
+    }
+
+    cellIndex++;
+  }
+
+  // Map the active cells to the skill order array
+  allActiveCells.forEach(({ skill, position }) => {
+    if (position < 18 && skillOrder[position] === '') {
+      skillOrder[position] = skill;
+    }
+  });
+
+  // Remove empty slots and return only filled positions
+  const finalOrder = skillOrder.filter(skill => skill !== '');
+  return finalOrder.length >= 6 ? finalOrder : [];
+}

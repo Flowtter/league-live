@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactPlayer from 'react-player/youtube';
-import { fetchChampionAbilities, searchYouTubeVideos } from '../utils/api';
+import { fetchChampionAbilities, searchYouTubeVideos, fetchSkillOrder } from '../utils/api';
 
 function ChampionDetails({ championName, myChampionName }) {
   const [abilities, setAbilities] = useState([]);
   const [videos, setVideos] = useState({ guide: null, matchup: null });
+  const [skillOrder, setSkillOrder] = useState([]);
   const [loadingAbilities, setLoadingAbilities] = useState(false);
   const [loadingVideos, setLoadingVideos] = useState(false);
+  const [loadingSkillOrder, setLoadingSkillOrder] = useState(false);
 
   const fetchAbilities = useCallback(async () => {
     setLoadingAbilities(true);
@@ -47,12 +49,26 @@ function ChampionDetails({ championName, myChampionName }) {
     }
   }, [championName, myChampionName]);
 
+  const fetchSkillOrderData = useCallback(async () => {
+    setLoadingSkillOrder(true);
+    try {
+      const order = await fetchSkillOrder(championName);
+      setSkillOrder(order);
+    } catch (error) {
+      console.error('Error fetching skill order:', error);
+      setSkillOrder([]);
+    } finally {
+      setLoadingSkillOrder(false);
+    }
+  }, [championName]);
+
   useEffect(() => {
     if (championName) {
       fetchAbilities();
       fetchVideos();
+      fetchSkillOrderData();
     }
-  }, [championName, fetchAbilities, fetchVideos]);
+  }, [championName, fetchAbilities, fetchVideos, fetchSkillOrderData]);
 
   const renderVideoContainer = (title, video, loading) => (
     // do not display the title anymore
@@ -84,6 +100,10 @@ function ChampionDetails({ championName, myChampionName }) {
     </div>
   );
 
+  const renderSkillOrderCard = () => {
+    return renderSkillOrder();
+  };
+
   const renderAbilities = () => {
     if (loadingAbilities) {
       return (
@@ -93,24 +113,84 @@ function ChampionDetails({ championName, myChampionName }) {
       );
     }
 
-    return abilities.map((ability, index) => (
-      <div key={index} className="ability-card">
-        <div className="ability-header">
-          <img className="ability-icon" src={ability.iconUrl} alt={ability.name} />
-          <span className="ability-key">{ability.key}</span>
-          <span className="ability-name">{ability.name}</span>
-        </div>
-        <div className="ability-cooldowns">
-          {Array.isArray(ability.cooldowns)
-            ? ability.cooldowns.join(' / ') + 's'
-            : ability.cooldowns}
-        </div>
-        <div
-          className="ability-description"
-          dangerouslySetInnerHTML={{ __html: ability.description }}
-        />
+    const allCards = [];
+
+    // Add skill order as first card
+    allCards.push(
+      <div class="ability-card" key="skill-order">
+        {renderSkillOrderCard()}
       </div>
-    ));
+    );
+
+    // Add ability cards
+    abilities.forEach((ability, index) => {
+      allCards.push(
+        <div key={`ability-${index}`} className="ability-card">
+          <div className="ability-header">
+            <img className="ability-icon" src={ability.iconUrl} alt={ability.name} />
+            <span className="ability-key">{ability.key}</span>
+            <span className="ability-name">{ability.name}</span>
+          </div>
+          <div className="ability-cooldowns">
+            {Array.isArray(ability.cooldowns)
+              ? ability.cooldowns.join(' / ') + 's'
+              : ability.cooldowns}
+          </div>
+          <div
+            className="ability-description"
+            dangerouslySetInnerHTML={{ __html: ability.description }}
+          />
+        </div>
+      );
+    });
+
+    return allCards;
+  };
+
+  const renderSkillOrder = () => {
+    if (loadingSkillOrder) {
+      return <div className="loading">Loading skill order...</div>;
+    }
+
+    if (skillOrder.length === 0) {
+      return <div style={{ color: '#95a5a6', fontStyle: 'italic' }}>No skill order found</div>;
+    }
+
+    // Create 18x4 grid (18 levels, 4 abilities)
+    const levels = Array.from({ length: 18 }, (_, i) => i + 1);
+    const skills = ['Q', 'W', 'E', 'R'];
+
+    return (
+      <div className="skill-order-grid">
+        {/* Header row with levels */}
+        <div className="skill-level-header">
+          <div className="skill-label" style={{ visibility: 'hidden' }}></div>
+          {levels.map(level => (
+            <div key={level} className="level-number">
+              {level}
+            </div>
+          ))}
+        </div>
+
+        {/* Skill rows */}
+        {skills.map(skill => (
+          <div key={skill} className="skill-row">
+            <div className="skill-label">{skill}</div>
+            {levels.map(level => {
+              const isLeveled = skillOrder[level - 1] === skill;
+              return (
+                <div
+                  key={`${skill}-${level}`}
+                  className={`skill-cell ${isLeveled ? 'active' : ''}`}
+                >
+                  {isLeveled ? skill : ''}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
   };
 
   if (!championName) {
