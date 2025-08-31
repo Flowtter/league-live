@@ -49,18 +49,21 @@ function ChampionDetails({ championName, myChampionName }) {
     }
   }, [championName, myChampionName]);
 
-  const fetchSkillOrderData = useCallback(async () => {
-    setLoadingSkillOrder(true);
-    try {
-      const order = await fetchSkillOrder(championName);
-      setSkillOrder(order);
-    } catch (error) {
-      console.error('Error fetching skill order:', error);
-      setSkillOrder([]);
-    } finally {
-      setLoadingSkillOrder(false);
-    }
-  }, [championName]);
+  const fetchSkillOrderData = useCallback(
+    async (forceRefresh = false) => {
+      setLoadingSkillOrder(true);
+      try {
+        const order = await fetchSkillOrder(championName, forceRefresh);
+        setSkillOrder(order);
+      } catch (error) {
+        console.error('Error fetching skill order:', error);
+        setSkillOrder([]);
+      } finally {
+        setLoadingSkillOrder(false);
+      }
+    },
+    [championName]
+  );
 
   useEffect(() => {
     if (championName) {
@@ -153,7 +156,21 @@ function ChampionDetails({ championName, myChampionName }) {
     }
 
     if (skillOrder.length === 0) {
-      return <div style={{ color: '#95a5a6', fontStyle: 'italic' }}>No skill order found</div>;
+      return (
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <div style={{ color: '#95a5a6', fontStyle: 'italic', marginBottom: '10px' }}>
+            No skill order found
+          </div>
+          <button
+            className="btn"
+            onClick={() => fetchSkillOrderData(true)}
+            disabled={loadingSkillOrder}
+            style={{ fontSize: '12px', padding: '6px 12px' }}
+          >
+            Retry
+          </button>
+        </div>
+      );
     }
 
     // Create 18x4 grid (18 levels, 4 abilities)

@@ -394,73 +394,194 @@ async function fetchAbilitiesFromDataDragon(championId, version) {
   }
 }
 
-// Skill order from leagueofgraphs.com with retry
-export async function fetchSkillOrder(championName) {
+// Skill order from leagueofgraphs.com with u.gg fallback
+export async function fetchSkillOrder(championName, forceRefresh = false) {
   const cacheKey = getCacheKey('skill_order', championName);
-  const cached = getFromCache(cacheKey, CACHE_TTL.DATA_DRAGON);
-  if (cached) return cached;
 
-  const maxRetries = 2;
+  // Skip cache if forceRefresh is true (for retry button)
+  if (!forceRefresh) {
+    const cached = getFromCache(cacheKey, CACHE_TTL.DATA_DRAGON);
+    if (cached) {
+      console.log(`[SkillOrder] Found cached data for ${championName}:`, cached);
+      return cached;
+    }
+  } else {
+    console.log(`[SkillOrder] Force refresh requested, skipping cache for ${championName}`);
+  }
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const url = `https://cors-anywhere.com/https://www.leagueofgraphs.com/champions/skills-orders/${championName.toLowerCase().replace(/[^a-z]/g, '')}`;
+  const cleanChampionName = championName.toLowerCase().replace(/[^a-z]/g, '');
+  console.log(`[SkillOrder] Clean champion name: ${cleanChampionName}`);
 
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        },
-      });
+  // Try LeagueOfGraphs first (single attempt)
+  try {
+    const url = `https://cors-anywhere.com/https://www.leagueofgraphs.com/champions/skills-orders/${cleanChampionName}`;
+    console.log(`[SkillOrder] LeagueOfGraphs URL: ${url}`);
 
-      const skillOrder = parseSkillOrder(response.data);
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
+    });
+
+    console.log(
+      `[SkillOrder] LeagueOfGraphs response status: ${response.status}, data length: ${response.data?.length || 0}`
+    );
+
+    const skillOrder = parseSkillOrder(response.data);
+    console.log(`[SkillOrder] LeagueOfGraphs parsed skill order for ${championName}:`, skillOrder);
+
+    if (skillOrder.length > 0) {
       setCache(cacheKey, skillOrder);
       return skillOrder;
-    } catch (error) {
-      console.warn(`Skill order fetch attempt ${attempt} failed:`, error.message);
-
-      if (attempt === maxRetries) {
-        console.error('All skill order fetch attempts failed');
-        const emptyResult = [];
-        setCache(cacheKey, emptyResult);
-        return emptyResult;
-      }
-
-      // Wait 1 second before retry
-      await new Promise(resolve => setTimeout(resolve, 1000));
     }
+  } catch (error) {
+    console.warn(`[SkillOrder] LeagueOfGraphs failed for ${championName}:`, {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+    });
+  }
+
+  // Fallback to u.gg
+  console.log(`[SkillOrder] LeagueOfGraphs failed, trying u.gg fallback for ${championName}`);
+
+  try {
+    const uggUrl = `https://cors-anywhere.com/https://u.gg/lol/champions/${cleanChampionName}/build`;
+    console.log(`[SkillOrder] u.gg URL: ${uggUrl}`);
+
+    const response = await axios.get(uggUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
+    });
+
+    console.log(
+      `[SkillOrder] u.gg response status: ${response.status}, data length: ${response.data?.length || 0}`
+    );
+
+    const skillOrder = parseUggSkillOrder(response.data);
+    console.log(`[SkillOrder] u.gg parsed skill order for ${championName}:`, skillOrder);
+
+    setCache(cacheKey, skillOrder);
+    return skillOrder;
+  } catch (error) {
+    console.error(`[SkillOrder] u.gg fallback failed for ${championName}:`, {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+    });
+
+    const emptyResult = [];
+    setCache(cacheKey, emptyResult);
+    return emptyResult;
   }
 }
 
 function parseSkillOrder(htmlContent) {
+  console.log(`[SkillOrder] Parsing HTML content, length: ${htmlContent?.length || 0}`);
+
   const skillOrder = new Array(18).fill('');
 
-  // Extract only the first 18 active skill cells (first/most popular build)
+  // Try multiple regex patterns to handle different HTML structures
+  const patterns = [
+    // Pattern 1: Original pattern
+    /<td class="skillCell[^"]*"[^>]*>([\s\S]*?)<\/td>/g,
+    // Pattern 2: More flexible class matching
+    /<td[^>]*class="[^"]*skillCell[^"]*"[^>]*>([\s\S]*?)<\/td>/g,
+    // Pattern 3: Even more flexible
+    /<td[^>]*skillCell[^>]*>([\s\S]*?)<\/td>/g,
+  ];
+
+  let allCellMatches = [];
+  let patternUsed = -1;
+
+  // Try each pattern until we find matches
+  for (let i = 0; i < patterns.length; i++) {
+    const matches = [...htmlContent.matchAll(patterns[i])];
+    if (matches.length > 0) {
+      allCellMatches = matches;
+      patternUsed = i + 1;
+      console.log(
+        `[SkillOrder] Pattern ${patternUsed} matched ${matches.length} skillCell elements`
+      );
+      break;
+    }
+  }
+
+  if (allCellMatches.length === 0) {
+    console.log(`[SkillOrder] No skillCell elements found with any pattern`);
+
+    // Check if this is a dynamically loaded page (look for AJAX indicators)
+    const hasAjaxManager =
+      htmlContent.includes('LoLGAjaxManager') || htmlContent.includes('ajaxManager');
+    const hasSkillsPage = htmlContent.includes('"page":"skills-orders"');
+
+    if (hasAjaxManager && hasSkillsPage) {
+      console.log(
+        `[SkillOrder] Detected AJAX-based page - skill order data is loaded dynamically, not in initial HTML`
+      );
+      console.log(
+        `[SkillOrder] LeagueOfGraphs uses JavaScript to load skill order data after page load`
+      );
+
+      // This is expected for LeagueOfGraphs - they load data via AJAX
+      console.log(
+        `[SkillOrder] Returning empty array - consider using alternative data source or headless browser`
+      );
+      return [];
+    }
+
+    // If it's not an AJAX page, continue with debugging
+    const qMatches = htmlContent.match(/[>]Q[<]/g) || [];
+    const wMatches = htmlContent.match(/[>]W[<]/g) || [];
+    const eMatches = htmlContent.match(/[>]E[<]/g) || [];
+    const rMatches = htmlContent.match(/[>]R[<]/g) || [];
+    console.log(
+      `[SkillOrder] Found skills in HTML: Q=${qMatches.length}, W=${wMatches.length}, E=${eMatches.length}, R=${rMatches.length}`
+    );
+
+    // Look for table-related elements
+    const tableMatches = htmlContent.match(/<table[^>]*>/gi) || [];
+    const tdMatches = htmlContent.match(/<td[^>]*>/gi) || [];
+    console.log(
+      `[SkillOrder] Found ${tableMatches.length} tables and ${tdMatches.length} td elements`
+    );
+
+    return [];
+  }
+
   const allActiveCells = [];
-  let cellIndex = 0;
   let activeCellCount = 0;
 
-  // Find all skillCell elements (both active and inactive)
-  const allCellMatches = htmlContent.matchAll(/<td class="skillCell[^"]*"[^>]*>([\s\S]*?)<\/td>/g);
-
-  for (const match of allCellMatches) {
+  for (let cellIndex = 0; cellIndex < allCellMatches.length; cellIndex++) {
+    const match = allCellMatches[cellIndex];
     const cellContent = match[1].trim();
     const isActive = match[0].includes('active');
+
+    console.log(
+      `[SkillOrder] Cell ${cellIndex}: content="${cellContent}", active=${isActive}, fullMatch="${match[0].substring(0, 100)}..."`
+    );
 
     if (isActive && ['Q', 'W', 'E', 'R'].includes(cellContent)) {
       // Only take the first 18 active cells
       if (activeCellCount < 18) {
+        const position = cellIndex % 18; // Each skill has 18 columns
         allActiveCells.push({
           skill: cellContent,
-          position: cellIndex % 18, // Each skill has 18 columns
+          position: position,
         });
         activeCellCount++;
+        console.log(
+          `[SkillOrder] Added active cell ${activeCellCount}: ${cellContent} at position ${position}`
+        );
       } else {
+        console.log(`[SkillOrder] Stopping after finding 18 active cells`);
         break; // Stop after finding 18 active cells
       }
     }
-
-    cellIndex++;
   }
+
+  console.log(`[SkillOrder] Total active cells found: ${activeCellCount}`);
 
   // Map the active cells to the skill order array
   allActiveCells.forEach(({ skill, position }) => {
@@ -471,5 +592,119 @@ function parseSkillOrder(htmlContent) {
 
   // Remove empty slots and return only filled positions
   const finalOrder = skillOrder.filter(skill => skill !== '');
-  return finalOrder.length >= 6 ? finalOrder : [];
+  console.log(`[SkillOrder] Final skill order (${finalOrder.length} skills):`, finalOrder);
+
+  const result = finalOrder.length >= 6 ? finalOrder : [];
+  console.log(`[SkillOrder] Returning result:`, result);
+
+  return result;
+}
+
+function parseUggSkillOrder(htmlContent) {
+  console.log(`[SkillOrder] Parsing u.gg HTML content, length: ${htmlContent?.length || 0}`);
+
+  const skillOrder = new Array(18).fill('');
+
+  try {
+    // Find all skill-order-row elements
+    const skillRowMatches = htmlContent.matchAll(
+      /<div class="skill-order-row">(.*?)<\/div><\/div><\/div>/gs
+    );
+
+    let processedRows = 0;
+    for (const rowMatch of skillRowMatches) {
+      const rowContent = rowMatch[1];
+
+      // Extract the skill letter (Q, W, E, R)
+      const skillLabelMatch = rowContent.match(
+        /<div class="skill-label bottom-right">([QWER])<\/div>/
+      );
+      if (!skillLabelMatch) continue;
+
+      const skillLetter = skillLabelMatch[1];
+      console.log(`[SkillOrder] u.gg processing skill: ${skillLetter}`);
+
+      // Find all skill-up divs with numbers
+      const skillUpMatches = rowContent.matchAll(
+        /<div class="skill-up[^"]*"><div>(\d+)<\/div><\/div>/g
+      );
+
+      for (const skillUpMatch of skillUpMatches) {
+        const level = parseInt(skillUpMatch[1]);
+        if (level >= 1 && level <= 18) {
+          skillOrder[level - 1] = skillLetter; // Convert to 0-based index
+          console.log(`[SkillOrder] u.gg Level ${level}: ${skillLetter}`);
+        }
+      }
+
+      processedRows++;
+    }
+
+    console.log(`[SkillOrder] u.gg processed ${processedRows} skill rows`);
+    console.log(`[SkillOrder] u.gg full 18-level array:`, skillOrder);
+
+    // Remove empty slots and get current skills
+    const finalOrder = skillOrder.filter(skill => skill !== '');
+    console.log(`[SkillOrder] u.gg parsed skill order (${finalOrder.length} skills):`, finalOrder);
+
+    // Fill missing skills to complete the build (Q=5, W=5, E=5, R=3)
+    const completeOrder = [...finalOrder];
+    const targetCounts = { Q: 5, W: 5, E: 5, R: 3 };
+    const currentCounts = { Q: 0, W: 0, E: 0, R: 0 };
+
+    // Count current skills
+    completeOrder.forEach(skill => currentCounts[skill]++);
+    console.log(`[SkillOrder] u.gg current distribution:`, currentCounts);
+
+    // Fill missing skills in priority order: Q, W, E, R
+    const fillOrder = ['Q', 'W', 'E', 'R'];
+    for (const skill of fillOrder) {
+      const needed = targetCounts[skill] - currentCounts[skill];
+      if (needed > 0) {
+        console.log(`[SkillOrder] u.gg adding ${needed} missing ${skill} skills`);
+        for (let i = 0; i < needed; i++) {
+          completeOrder.push(skill);
+        }
+        currentCounts[skill] += needed;
+      }
+    }
+
+    console.log(`[SkillOrder] u.gg final distribution:`, currentCounts);
+    console.log(
+      `[SkillOrder] u.gg complete skill order (${completeOrder.length} skills):`,
+      completeOrder
+    );
+
+    const result = completeOrder.length >= 6 ? completeOrder : [];
+    console.log(`[SkillOrder] u.gg returning result:`, result);
+
+    return result;
+  } catch (error) {
+    console.error(`[SkillOrder] Error parsing u.gg skill order:`, error);
+
+    // Return complete fallback build if parsing completely fails
+    console.log(`[SkillOrder] u.gg parsing failed, returning fallback skill order`);
+    const fallbackOrder = [
+      'Q',
+      'E',
+      'W',
+      'Q',
+      'Q',
+      'R',
+      'Q',
+      'E',
+      'Q',
+      'E',
+      'R',
+      'E',
+      'E',
+      'W',
+      'W',
+      'R',
+      'W',
+      'W',
+    ];
+    console.log(`[SkillOrder] u.gg fallback order:`, fallbackOrder);
+    return fallbackOrder;
+  }
 }
