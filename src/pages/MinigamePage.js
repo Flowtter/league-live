@@ -96,6 +96,11 @@ function MinigamePage() {
     const saved = localStorage.getItem('minigame_cooldown_disabled');
     return saved ? JSON.parse(saved) : false;
   });
+  const [hardcoreMode, setHardcoreMode] = useState(() => {
+    const saved = localStorage.getItem('minigame_hardcore_mode');
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [cooldownGuess, setCooldownGuess] = useState('');
 
   useEffect(() => {
     loadChampions();
@@ -116,6 +121,11 @@ function MinigamePage() {
     localStorage.setItem('minigame_cooldown_disabled', JSON.stringify(cooldownDisabled));
   }, [cooldownDisabled]);
 
+  // Save hardcore mode setting to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('minigame_hardcore_mode', JSON.stringify(hardcoreMode));
+  }, [hardcoreMode]);
+
   const loadChampions = async () => {
     try {
       const version = await fetchDataDragonVersion();
@@ -126,6 +136,8 @@ function MinigamePage() {
           id: parseInt(champion.key),
           name: champion.name,
           key: key,
+          tags: champion.tags || [],
+          primaryRole: champion.tags ? champion.tags[0] : 'Unknown'
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -168,6 +180,10 @@ function MinigamePage() {
       if (abilities.length > 0) {
         const randomAbility = abilities[Math.floor(Math.random() * abilities.length)];
 
+        // Clear input states FIRST before setting new challenge
+        setUserGuess('');
+        setCooldownGuess('');
+
         setCurrentChallenge({
           champion: randomChampion,
           ability: randomAbility,
@@ -176,7 +192,6 @@ function MinigamePage() {
         setAllAbilities(abilities);
         setSkillOrder(skillOrderData);
         setGameState('playing');
-        setUserGuess('');
       }
     } catch (error) {
       console.error('Error generating challenge:', error);
@@ -203,7 +218,13 @@ function MinigamePage() {
     const guess = guessToCheck.toLowerCase();
     const correct = currentChallenge.champion.name.toLowerCase();
     const distance = levenshteinDistance(guess, correct);
-    const isCorrect = guess === correct || distance <= 2;
+    let isCorrect = guess === correct || distance <= 2;
+
+    // In hardcore mode, also validate cooldown guess
+    if (hardcoreMode && isCorrect) {
+      const cooldownCorrect = validateCooldownGuess(cooldownGuess, currentChallenge.ability.cooldowns);
+      isCorrect = isCorrect && cooldownCorrect;
+    }
 
     if (isCorrect) {
       setStreak(prev => prev + 1);
@@ -284,12 +305,74 @@ function MinigamePage() {
     return `https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/champion/${championKey}.png`;
   };
 
-  const getScoreBadgeColor = (score) => {
-    if (score < 0) return '#e74c3c';
-    if (score === 0) return '#95a5a6';
-    if (score <= 5) return '#f39c12';
-    if (score <= 15) return '#3498db';
-    return '#27ae60';
+  const getMasteryLevel = (score) => {
+    if (score < -2) return { level: 'Iron', tier: 1, color: '#5A4A42', threshold: -2 };
+    if (score < 0) return { level: 'Bronze', tier: 2, color: '#8B4513', threshold: 0 };
+    if (score < 1) return { level: 'Silver', tier: 3, color: '#8A8A8A', threshold: 1 };
+    if (score < 2) return { level: 'Gold', tier: 4, color: '#FFD700', threshold: 2 };
+    if (score < 3) return { level: 'Platinum', tier: 5, color: '#0F7B7C', threshold: 3 };
+    if (score < 4) return { level: 'Emerald', tier: 6, color: '#00A86B', threshold: 4 };
+    if (score < 5) return { level: 'Diamond', tier: 7, color: '#3E90D9', threshold: 5 };
+    if (score < 7) return { level: 'Master', tier: 8, color: '#9932CC', threshold: 7 };
+    if (score < 10) return { level: 'Grandmaster', tier: 9, color: '#DC143C', threshold: 10 };
+    return { level: 'Challenger', tier: 10, color: '#F4A460', threshold: 15 };
+  };
+
+
+  const validateCooldownGuess = (guess, actualCooldowns) => {
+    if (!guess || !actualCooldowns) return false;
+
+    const guessNum = parseFloat(guess);
+    if (isNaN(guessNum)) return false;
+
+    // Get level 1 cooldown (first value in array or the single value)
+    let level1Cooldown;
+    if (Array.isArray(actualCooldowns)) {
+      level1Cooldown = actualCooldowns[0];
+    } else {
+      // Parse single value or range like "12 / 11 / 10 / 9 / 8"
+      const cooldownStr = actualCooldowns.toString();
+      const firstValue = cooldownStr.split('/')[0].trim();
+      level1Cooldown = parseFloat(firstValue);
+    }
+
+    if (isNaN(level1Cooldown)) return false;
+
+    // Allow ±1 second tolerance
+    return Math.abs(guessNum - level1Cooldown) <= 1;
+  };
+
+  const getCollectionProgress = () => {
+    const roleProgress = {};
+    const roleMap = {
+      'Fighter': 'Fighter',
+      'Tank': 'Tank',
+      'Assassin': 'Assassin',
+      'Mage': 'Mage',
+      'Marksman': 'Marksman',
+      'Support': 'Support'
+    };
+
+    // Initialize progress for each role
+    Object.values(roleMap).forEach(role => {
+      roleProgress[role] = { total: 0, mastered: 0, totalScore: 0 };
+    });
+
+    champions.forEach(champion => {
+      const role = roleMap[champion.primaryRole] || 'Other';
+      if (roleProgress[role]) {
+        roleProgress[role].total += 1;
+        const score = championScores[champion.name] || 0;
+        roleProgress[role].totalScore += score;
+
+        // Consider "mastered" if Emerald level or higher (4+ points)
+        if (score >= 4) {
+          roleProgress[role].mastered += 1;
+        }
+      }
+    });
+
+    return roleProgress;
   };
 
   const filteredChampions = champions.filter(champion =>
@@ -298,25 +381,33 @@ function MinigamePage() {
 
   const createChampionItem = champion => {
     const score = championScores[champion.name] || 0;
-    const badgeColor = getScoreBadgeColor(score);
+    const mastery = getMasteryLevel(score);
 
     return (
       <div
         key={champion.id}
         className="champion-item"
+        title={`${champion.name} - ${mastery.level} (${score} points)`}
       >
         <img
           className="champion-portrait"
           src={getChampionIconUrl(champion.key)}
           alt={champion.name}
+          style={{
+            border: `3px solid ${mastery.color}`,
+            borderRadius: '8px'
+          }}
         />
         <div
-          className="learning-badge"
+          className={`mastery-badge ${mastery.tier >= 7 ? 'high-tier' : ''}`}
           style={{
-            backgroundColor: badgeColor,
-            color: score < 0 ? '#ffffff' : score === 0 ? '#ffffff' : '#000000',
+            backgroundColor: mastery.color,
+            color: mastery.tier <= 2 ? '#ffffff' : '#000000',
           }}
         >
+          {mastery.level === 'Grandmaster' ? 'GM' : mastery.level === 'Challenger' ? 'CH' : mastery.level.charAt(0)}
+        </div>
+        <div className="score-display">
           {score}
         </div>
       </div>
@@ -329,16 +420,55 @@ function MinigamePage() {
     }
   };
 
+  // Clean Enter key handling
   useEffect(() => {
-    const handleKeyPress = (e) => {
-      if (e.key === 'Enter' && gameState === 'revealed' && !cooldownActive) {
-        handleNewChallenge();
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        const championInput = document.querySelector('.champion-dropdown-container input');
+        const cooldownInput = document.querySelector('.cooldown-input');
+        const activeElement = document.activeElement;
+
+        // If typing for a champ and not hardcore mode, validate the option
+        if (activeElement === championInput && !hardcoreMode && gameState === 'playing') {
+          // Don't interfere - let ChampionDropdown handle selection, then submit
+          setTimeout(() => {
+            handleSubmitGuess();
+          }, 10);
+          return;
+        }
+
+        // If typing for a champ in hardcore mode, switch to cooldown
+        if (activeElement === championInput && hardcoreMode && gameState === 'playing') {
+          // Don't prevent default - let ChampionDropdown handle the selection first
+          // Then move to cooldown input after selection is complete
+          setTimeout(() => {
+            if (cooldownInput) {
+              cooldownInput.focus();
+            }
+          }, 10);
+          return;
+        }
+
+        // If in cooldown input, submit the guess
+        if (activeElement === cooldownInput && gameState === 'playing') {
+          e.preventDefault();
+          handleSubmitGuess();
+          return;
+        }
+
+        // If in revealed state, start new challenge
+        if (gameState === 'revealed' && !cooldownActive) {
+          e.preventDefault();
+          handleNewChallenge();
+          return;
+        }
       }
     };
 
-    document.addEventListener('keydown', handleKeyPress);
-    return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [gameState, champions, cooldownActive]); // eslint-disable-line react-hooks/exhaustive-deps
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [hardcoreMode, gameState, cooldownActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const renderSkillOrder = () => {
     if (skillOrder.length === 0) {
@@ -398,6 +528,17 @@ function MinigamePage() {
 
           <div className="streak-display">
             <div className="cooldown-toggle">
+              <span>Hardcore:</span>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={hardcoreMode}
+                  onChange={(e) => setHardcoreMode(e.target.checked)}
+                />
+                <span className="slider"></span>
+              </label>
+            </div>
+            <div className="cooldown-toggle">
               <span>No Cooldown:</span>
               <label className="toggle-switch">
                 <input
@@ -420,6 +561,29 @@ function MinigamePage() {
 
         <div className="main-content">
           <div className="learn-champions-grid">
+            <div className="collection-progress">
+              <h4>Collection Progress</h4>
+              <div className="role-progress-container">
+                {Object.entries(getCollectionProgress()).map(([role, progress]) => (
+                  <div key={role} className="role-progress">
+                    <div className="role-header">
+                      <span className="role-name">{role}</span>
+                      <span className="role-stats">{progress.mastered}/{progress.total}</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{
+                          width: `${progress.total > 0 ? (progress.mastered / progress.total) * 100 : 0}%`,
+                          backgroundColor: progress.mastered === progress.total && progress.total > 0 ? '#27ae60' : '#3498db'
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="grid-search-container">
               <input
                 type="text"
@@ -459,6 +623,17 @@ function MinigamePage() {
 
         <div className="streak-display">
           <div className="cooldown-toggle">
+            <span>Hardcore:</span>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={hardcoreMode}
+                onChange={(e) => setHardcoreMode(e.target.checked)}
+              />
+              <span className="slider"></span>
+            </label>
+          </div>
+          <div className="cooldown-toggle">
             <span>No Cooldown:</span>
             <label className="toggle-switch">
               <input
@@ -481,6 +656,29 @@ function MinigamePage() {
 
       <div className="main-content">
         <div className="learn-champions-grid">
+          <div className="collection-progress">
+            <h4>Collection Progress</h4>
+            <div className="role-progress-container">
+              {Object.entries(getCollectionProgress()).map(([role, progress]) => (
+                <div key={role} className="role-progress">
+                  <div className="role-header">
+                    <span className="role-name">{role}</span>
+                    <span className="role-stats">{progress.mastered}/{progress.total}</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{
+                        width: `${progress.total > 0 ? (progress.mastered / progress.total) * 100 : 0}%`,
+                        backgroundColor: progress.mastered === progress.total && progress.total > 0 ? '#27ae60' : '#3498db'
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="grid-search-container">
             <input
               type="text"
@@ -517,14 +715,49 @@ function MinigamePage() {
                       selectedChampion={userGuess}
                       onChampionChange={setUserGuess}
                       placeholder="Enter champion name..."
-                      onEnterPress={handleSubmitGuess}
+                      onEnterPress={hardcoreMode ? (championName) => {
+                        // In hardcore mode, Enter just selects the champion
+                        // The champion is already selected by handleChampionSelect
+                        // No action needed here, just let the selection happen
+                      } : handleSubmitGuess}
+                      onTabPress={hardcoreMode ? (championName) => {
+                        // In hardcore mode, Tab moves to cooldown input
+                        if (championName && championName.trim()) {
+                          setTimeout(() => {
+                            const cooldownInput = document.querySelector('.cooldown-input');
+                            if (cooldownInput) {
+                              cooldownInput.focus();
+                            }
+                          }, 10);
+                        }
+                      } : null}
                       autoFocus={true}
                     />
+                    {hardcoreMode && (
+                      <div className="hardcore-input">
+                        <input
+                          type="number"
+                          className="cooldown-input"
+                          placeholder="Cooldown (sec)"
+                          value={cooldownGuess}
+                          onChange={(e) => setCooldownGuess(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSubmitGuess();
+                            }
+                          }}
+                          step="0.1"
+                          min="0"
+                          max="300"
+                          autoFocus={false}
+                        />
+                      </div>
+                    )}
                     <div className="guess-buttons">
                       <button
                         className="btn btn-success"
                         onClick={handleSubmitGuess}
-                        disabled={!userGuess.trim()}
+                        disabled={!userGuess.trim() || (hardcoreMode && !cooldownGuess.trim())}
                       >
                         Submit
                       </button>

@@ -6,6 +6,7 @@ function ChampionDropdown({
   onChampionChange,
   placeholder = 'Select Champion...',
   onEnterPress,
+  onTabPress,
   autoFocus = false,
 }) {
   const [champions, setChampions] = useState([]);
@@ -133,6 +134,23 @@ function ChampionDropdown({
         // Call onEnterPress callback after selection with the champion name
         if (onEnterPress) {
           setTimeout(() => onEnterPress(selectedChampionName), 0);
+        }
+      }
+    } else if (e.key === 'Tab') {
+      // Handle Tab key - close dropdown and call onTabPress if available
+      if (onTabPress) {
+        e.preventDefault();
+        setIsOpen(false);
+        setHighlightedIndex(-1);
+
+        // If there's a highlighted champion, select it first
+        if (highlightedIndex >= 0 && highlightedIndex < filteredChampions.length) {
+          const selectedChampionName = filteredChampions[highlightedIndex].name;
+          handleChampionSelect(selectedChampionName);
+          setTimeout(() => onTabPress(selectedChampionName), 0);
+        } else {
+          // No selection, just call onTabPress with current search term
+          setTimeout(() => onTabPress(searchTerm), 0);
         }
       }
     } else if (e.key === 'Escape') {
