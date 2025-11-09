@@ -266,6 +266,9 @@ function MinigamePage() {
       startCooldown();
     }
 
+    // -1 for the correct champion when skipping
+    updateChampionScore(currentChallenge.champion.name, -1);
+
     setCurrentChallenge(prev => ({
       ...prev,
       isCorrect: false,
