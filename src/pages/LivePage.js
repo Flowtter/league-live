@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { fetchLiveGame, fetchDataDragonVersion } from '../utils/api';
 import ChampionDetails from '../components/ChampionDetails';
+import AccountDropdown from '../components/AccountDropdown';
 import {
   getAccounts,
   saveAccount,
@@ -30,6 +31,9 @@ function Navigation() {
       </Link>
       <Link to="/random" className={`nav-link ${location.pathname === '/random' ? 'active' : ''}`}>
         Random
+      </Link>
+      <Link to="/minigame" className={`nav-link ${location.pathname === '/minigame' ? 'active' : ''}`}>
+        Minigame
       </Link>
     </div>
   );
@@ -72,7 +76,7 @@ function LivePage() {
       setSelectedAccount(lastSelected);
       fetchLiveGameData(lastSelected);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDataDragonVersion = useCallback(async () => {
     try {
@@ -145,8 +149,7 @@ function LivePage() {
     return `https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/champion/${championKey}.png`;
   };
 
-  const handleAccountChange = e => {
-    const accountName = e.target.value;
+  const handleAccountChange = accountName => {
     setSelectedAccount(accountName);
     if (accountName) {
       setLastSelectedAccount(accountName);
@@ -247,18 +250,12 @@ function LivePage() {
       <div className="top-menubar">
         <Navigation />
         <div className="menu-controls">
-          <select
-            className="accounts-dropdown"
-            value={selectedAccount}
-            onChange={handleAccountChange}
-          >
-            <option value="">Select Account...</option>
-            {accounts.map(account => (
-              <option key={account.name} value={account.name}>
-                {account.name} (EUW1)
-              </option>
-            ))}
-          </select>
+          <AccountDropdown
+            accounts={accounts}
+            selectedAccount={selectedAccount}
+            onAccountChange={handleAccountChange}
+            placeholder="Select Account..."
+          />
 
           <button className="btn" onClick={handleAddAccount}>
             Add Account

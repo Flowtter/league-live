@@ -88,6 +88,17 @@ body {
   background-color: #d35400;
 }
 
+.btn:disabled {
+  background-color: #7f8c8d;
+  color: #bdc3c7;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn:disabled:hover {
+  background-color: #7f8c8d;
+}
+
 .main-content {
   display: flex;
   margin-top: 60px;
@@ -249,6 +260,20 @@ body {
   position: relative;
 }
 
+.ability-card.challenge-ability {
+  background-color: #3a3a2f;
+  border-color: #d4ac0d;
+  box-shadow: 0 0 8px rgba(212, 172, 13, 0.3);
+}
+
+.ability-card.challenge-ability .ability-key {
+  background-color: #d4ac0d;
+  color: #1a252f;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: bold;
+}
+
 .ability-header {
   display: flex;
   align-items: center;
@@ -286,6 +311,7 @@ body {
   font-size: 13px;
   color: #95a5a6;
   line-height: 1.5;
+  text-align: left;
 }
 
 /* HTML content styling in ability descriptions */
@@ -375,16 +401,49 @@ body {
   padding: 20px;
   overflow-y: auto;
   overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.grid-search-container {
+  margin-bottom: 15px;
+  flex-shrink: 0;
+}
+
+.grid-search-input {
+  width: 100%;
+  background-color: #1a252f;
+  color: #95a5a6;
+  border: 1px solid #2980b9;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.grid-search-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.champions-grid-content {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   align-content: start;
-  box-sizing: border-box;
 }
 
 .learn-details {
   margin-left: 300px;
   padding: 20px;
+  width: calc(100vw - 300px);
+  min-width: calc(100vw - 300px);
+}
+
+.learn-details .challenge-container,
+.learn-details > div {
+  width: 100%;
 }
 
 .learn-champions-grid .champion-item {
@@ -488,3 +547,324 @@ body {
   background-color: #d4ac0d;
   color: #1a252f;
 }
+
+/* Champion Dropdown Search Styles */
+.champion-dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.champion-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #1a252f;
+  border: 1px solid #2980b9;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1001;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.champion-dropdown-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #95a5a6;
+  transition: background-color 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.champion-dropdown-item:hover,
+.champion-dropdown-item.highlighted {
+  background-color: #2980b9;
+  color: white;
+}
+
+.champion-dropdown-item.no-results {
+  cursor: default;
+  font-style: italic;
+  color: #7f8c8d;
+}
+
+.champion-dropdown-item.no-results:hover {
+  background-color: transparent;
+  color: #7f8c8d;
+}
+
+.champion-dropdown-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid #34495e;
+}
+
+.champion-dropdown-name {
+  flex: 1;
+  font-size: 14px;
+}
+
+/* Minigame Styles */
+.minigame-content {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.challenge-container {
+  width: 100%;
+  max-width: none;
+}
+
+.ability-challenge {
+  width: 100%;
+  text-align: center;
+}
+
+.challenge-header h3 {
+  color: #ecf0f1;
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.challenge-header p {
+  color: #95a5a6;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.ability-description-box {
+  background-color: #1a252f;
+  border: 1px solid #34495e;
+  border-radius: 6px;
+  padding: 20px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.guess-section {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+}
+
+.guess-section .champion-dropdown-container {
+  width: 300px;
+}
+
+.guess-section .accounts-dropdown {
+  width: 100%;
+  font-size: 16px;
+  padding: 10px 15px;
+}
+
+.guess-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.streak-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #95a5a6;
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.cooldown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #34495e;
+  transition: .4s;
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #27ae60;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+.streak-counter {
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: bold;
+  min-width: 20px;
+  text-align: center;
+  transition: background-color 0.3s ease;
+}
+
+.streak-counter[data-streak="0"] { background-color: #e74c3c; }
+.streak-counter[data-streak="1"] { background-color: #e67e22; }
+.streak-counter[data-streak="2"] { background-color: #f39c12; }
+.streak-counter[data-streak="3"] { background-color: #f1c40f; }
+.streak-counter[data-streak="4"] { background-color: #9b59b6; }
+.streak-counter[data-streak="5"] { background-color: #27ae60; }
+
+.reveal-section {
+  margin-top: 20px;
+}
+
+.answer-result {
+  color: white;
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.answer-result.correct {
+  background-color: #27ae60;
+}
+
+.answer-result.incorrect {
+  background-color: #e74c3c;
+}
+
+.answer-result h4 {
+  margin: 0 0 5px 0;
+  font-size: 20px;
+}
+
+.answer-result p {
+  margin: 5px 0;
+  opacity: 0.9;
+}
+
+.all-abilities {
+  margin: 20px 0;
+  text-align: left;
+}
+
+.all-abilities h5 {
+  color: #ecf0f1;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+
+.abilities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.ability-item-detailed {
+  background-color: #1a252f;
+  border: 1px solid #34495e;
+  border-radius: 6px;
+  padding: 15px;
+}
+
+.ability-header-detailed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ability-description-small {
+  font-size: 13px;
+  color: #95a5a6;
+  line-height: 1.5;
+  margin-top: 10px;
+}
+
+.abilities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.ability-item {
+  display: flex;
+  align-items: center;
+  background-color: #1a252f;
+  border: 1px solid #34495e;
+  border-radius: 6px;
+  padding: 10px;
+  gap: 10px;
+}
+
+.ability-icon-small {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.ability-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.ability-key-small {
+  font-weight: bold;
+  color: #d4ac0d;
+  font-size: 14px;
+}
+
+.ability-name-small {
+  color: #bdc3c7;
+  font-size: 13px;
+}
+
+.ability-cd-small {
+  color: #2980b9;
+  font-size: 11px;
+  font-weight: 600;
+}
+

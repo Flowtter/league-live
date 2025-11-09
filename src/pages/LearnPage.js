@@ -28,6 +28,9 @@ function Navigation() {
       <Link to="/random" className={`nav-link ${location.pathname === '/random' ? 'active' : ''}`}>
         Random
       </Link>
+      <Link to="/minigame" className={`nav-link ${location.pathname === '/minigame' ? 'active' : ''}`}>
+        Minigame
+      </Link>
     </div>
   );
 }
@@ -38,6 +41,7 @@ function LearnPage() {
   const [selectedLearnChampion, setSelectedLearnChampion] = useState('');
   const [ddVersion, setDdVersion] = useState(null);
   const [learningRange, setLearningRange] = useState({ min: 0, max: 0 });
+  const [gridSearchTerm, setGridSearchTerm] = useState('');
 
   // Initialize
   useEffect(() => {
@@ -105,6 +109,10 @@ function LearnPage() {
     updateLearningRange();
   };
 
+  const filteredChampions = champions.filter(champion =>
+    champion.name.toLowerCase().includes(gridSearchTerm.toLowerCase())
+  );
+
   const createChampionItem = champion => {
     const isSelected = selectedLearnChampion === champion.name;
     const learningCount = getChampionLearningCount(champion.name);
@@ -158,7 +166,19 @@ function LearnPage() {
 
       <div className="main-content">
         <div className="learn-champions-grid">
-          {champions.map(champion => createChampionItem(champion))}
+          <div className="grid-search-container">
+            <input
+              type="text"
+              className="grid-search-input"
+              placeholder="Search champions..."
+              value={gridSearchTerm}
+              onChange={(e) => setGridSearchTerm(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <div className="champions-grid-content">
+            {filteredChampions.map(champion => createChampionItem(champion))}
+          </div>
         </div>
 
         <div className="learn-details">

@@ -28,6 +28,9 @@ function Navigation() {
       <Link to="/random" className={`nav-link ${location.pathname === '/random' ? 'active' : ''}`}>
         Random
       </Link>
+      <Link to="/minigame" className={`nav-link ${location.pathname === '/minigame' ? 'active' : ''}`}>
+        Minigame
+      </Link>
     </div>
   );
 }
